@@ -141,7 +141,7 @@ If there's no useful information available, simply say: "I couldn't find any inf
 Example output:
 "HDB flats are government-built public housing, typically more affordable at $800-1,800/month for a room. They're usually located near MRT stations and have basic amenities like playgrounds and hawker centers nearby.
 
-Condos are private developments that cost more ($1,200-2,500/month for a room) but come with premium facilities like swimming pools, gyms, and 24/7 security. They're often closer to universities and shopping areas.
+Condos are private developments that cost more ($1,400-2,500/month for a room) but come with premium facilities like swimming pools, gyms, and 24/7 security. They're often closer to universities and shopping areas.
 
 For students on a budget, HDB is recommended. If you value facilities and convenience, Condo might be worth the extra cost.
 

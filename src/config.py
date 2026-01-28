@@ -52,7 +52,7 @@ SPARSE_MODEL = "Qdrant/bm25"                              # BM25 sparse embeddin
 # LLM Selection (choose which one to use)
 # Option 1: Google Gemini (default)
 LLM_PROVIDER = "gemini"  # Options: "gemini" or "openai"
-LLM_MODEL = "gemini-2.0-flash-exp"  # For Gemini
+LLM_MODEL = "gemini-2.5-flash"  # For Gemini
 # LLM_MODEL = "gpt-4-turbo-preview"  # For OpenAI (alternative)
 
 LLM_TEMPERATURE = 0  # 0 for deterministic, 0.7 for creative
