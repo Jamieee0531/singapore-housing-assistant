@@ -2,9 +2,10 @@
 
 An intelligent RAG (Retrieval-Augmented Generation) system powered by LangGraph that helps international students navigate the Singapore rental housing market.
 
-![Python](https://img.shields.io/badge/python-3.10%2B-blue)
+![Python](https://img.shields.io/badge/python-3.12%2B-blue)
 ![LangChain](https://img.shields.io/badge/LangChain-1.2.3-green)
 ![LangGraph](https://img.shields.io/badge/LangGraph-1.0.5-orange)
+![Gradio](https://img.shields.io/badge/Gradio-6.3.0-ff7c00)
 
 ## 📋 Overview
 
@@ -12,6 +13,7 @@ This project provides an AI-powered conversational assistant specifically design
 
 ## ✨ Key Features
 
+- **🌐 Web Interface**: Modern Gradio-based chat UI
 - **📚 Intelligent Document Retrieval**: Hybrid search using dense and sparse embeddings
 - **🔄 Multi-Turn Conversations**: Natural follow-up questions with context awareness
 - **🎯 Query Analysis**: Automatic query rewriting and clarification
@@ -39,15 +41,16 @@ User Query → Query Analysis → Agent Subgraph → Answer Generation
 
 ## 🛠️ Tech Stack
 
-**Core**: LangChain 1.2.3, LangGraph 1.0.5, Python 3.10+  
-**LLM**: Google Gemini / OpenAI GPT  
-**Embeddings**: sentence-transformers/all-mpnet-base-v2  
+**Core**: LangChain 1.2.3, LangGraph 1.0.5, Python 3.12+
+**LLM**: Google Gemini (gemini-2.5-flash) / OpenAI GPT
+**Embeddings**: sentence-transformers/all-mpnet-base-v2, Qdrant/bm25
 **Database**: Qdrant (local vector store)
+**UI**: Gradio 6.3.0
 
 ## 📦 Installation
 
 ### Prerequisites
-- Python 3.10+
+- Python 3.12+
 - Google Gemini API key (or OpenAI)
 
 ### Quick Start
@@ -58,7 +61,7 @@ git clone https://github.com/yourusername/singapore-housing-assistant.git
 cd singapore-housing-assistant
 
 # Create virtual environment
-python -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate  # Mac/Linux
 # .venv\Scripts\activate  # Windows
 
@@ -72,11 +75,22 @@ cp .env.example .env
 # Index documents
 python indexing.py
 
-# Run assistant
-python test_chat.py
+# Run assistant (choose one)
+python app.py        # Web UI (recommended)
+python test_chat.py  # Command line
 ```
 
 ## 🚀 Usage
+
+### Web Interface (Recommended)
+
+```bash
+python app.py
+```
+
+Open http://localhost:7860 in your browser.
+
+![Web UI Screenshot](docs/screenshot.png)
 
 ### Command Line Chat
 
@@ -108,16 +122,22 @@ singapore-housing-assistant/
 │   ├── price_range.md
 │   └── ...
 ├── src/
+│   ├── config.py              # Configuration
 │   ├── core/                  # Core utilities
+│   │   ├── document_manager.py
+│   │   └── embeddings.py
 │   ├── db/                    # Data access layer
-│   │   └── parent_store_manager.py
+│   │   ├── parent_store_manager.py
+│   │   └── vector_db_manager.py
 │   ├── rag_agent/             # RAG logic
 │   │   ├── graph_state.py    # State definitions
 │   │   ├── prompts.py        # System prompts
 │   │   ├── tools.py          # Retrieval tools
 │   │   ├── nodes.py          # Graph nodes
 │   │   └── graph.py          # Main graph
-│   └── config.py              # Configuration
+│   └── ui/                    # User interface
+│       └── gradio_app.py     # Gradio web interface
+├── app.py                     # Web UI entry point
 ├── indexing.py                # Document indexing script
 ├── test_chat.py               # CLI interface
 ├── requirements.txt
@@ -132,7 +152,7 @@ Edit `src/config.py` to customize:
 ```python
 # LLM Configuration
 LLM_PROVIDER = "gemini"  # or "openai"
-LLM_MODEL = "gemini-1.5-flash"
+LLM_MODEL = "gemini-2.5-flash"
 LLM_TEMPERATURE = 0
 
 # Chunk Sizes
@@ -143,6 +163,16 @@ MAX_PARENT_SIZE = 10000
 # Retrieval
 TOP_K_CHILD_CHUNKS = 7
 MAX_PARENT_RETRIEVAL = 3
+```
+
+### Environment Variables
+
+Create a `.env` file in the project root:
+
+```bash
+# Required: At least one LLM API key
+GOOGLE_API_KEY=your-gemini-api-key
+OPENAI_API_KEY=your-openai-api-key  # Optional alternative
 ```
 
 ## 🎓 How It Works
@@ -177,12 +207,12 @@ docs/ → [Split by headers] → parent_store/ (JSON)
 
 ## 🔮 Future Enhancements
 
-- [ ] Web UI with Gradio/Streamlit
+- [x] Web UI with Gradio
 - [ ] Property listing integration (PropertyGuru API)
 - [ ] Multi-language support (Chinese, Malay)
 - [ ] Image analysis for property photos
 - [ ] Recommendation system based on preferences
-- [ ] PDF document upload support
+- [ ] PDF document upload via Web UI
 
 ## 🤝 Contributing
 

@@ -14,7 +14,7 @@ Commands:
 import os
 from langchain_core.messages import HumanMessage
 
-from src.config import get_llm_config, CHILD_COLLECTION
+from src.config import get_llm_config, CHILD_COLLECTION, QDRANT_DB_PATH
 from src.rag_agent.tools import ToolFactory
 from src.rag_agent.graph import create_agent_graph
 
@@ -84,7 +84,7 @@ def initialize_system():
     sparse_embeddings = FastEmbedSparse(model_name=SPARSE_MODEL)
     
     print("✓ Connecting to Qdrant...")
-    client = QdrantClient(path="qdrant_db")
+    client = QdrantClient(path=QDRANT_DB_PATH)
     
     if not client.collection_exists(CHILD_COLLECTION):
         print("\n❌ Error: Vector database not found!")

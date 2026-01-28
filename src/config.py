@@ -104,8 +104,7 @@ def get_llm_config():
         if not GOOGLE_API_KEY:
             raise ValueError("GOOGLE_API_KEY not set in .env file")
         return {
-            "provider": "gemini",
-            "api_key": GOOGLE_API_KEY,
+            "google_api_key": GOOGLE_API_KEY,
             "model": LLM_MODEL,
             "temperature": LLM_TEMPERATURE
         }
@@ -113,8 +112,7 @@ def get_llm_config():
         if not OPENAI_API_KEY:
             raise ValueError("OPENAI_API_KEY not set in .env file")
         return {
-            "provider": "openai",
-            "api_key": OPENAI_API_KEY,
+            "openai_api_key": OPENAI_API_KEY,
             "model": LLM_MODEL,
             "temperature": LLM_TEMPERATURE
         }

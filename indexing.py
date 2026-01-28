@@ -25,6 +25,7 @@ from src.config import (
     DOCS_DIR,
     MARKDOWN_DIR,
     PARENT_STORE_PATH,
+    QDRANT_DB_PATH,
     CHILD_COLLECTION,
     DENSE_MODEL,
     SPARSE_MODEL,
@@ -161,7 +162,7 @@ def clean_small_chunks(chunks, min_size):
             elif i < len(chunks) - 1:
                 # Merge with next chunk
                 chunks[i + 1].page_content = chunk.page_content + "\n\n" + chunks[i + 1].page_content
-                for k, v in chunk.metadata.items:
+                for k, v in chunk.metadata.items():
                     if k in chunks[i + 1].metadata:
                         chunks[i + 1].metadata[k] = f"{v} -> {chunks[i + 1].metadata[k]}"
                     else:
@@ -208,7 +209,7 @@ def index_documents():
     
     print("🔧 Initializing Qdrant vector database...")
     
-    client = QdrantClient(path="qdrant_db")
+    client = QdrantClient(path=QDRANT_DB_PATH)
     embedding_dimension = len(dense_embeddings.embed_query("test"))
     
     # Clear existing collection if needed
@@ -358,7 +359,7 @@ def index_documents():
     print(f"   - Documents processed: {len(md_files)}")
     print(f"   - Parent chunks: {len(all_parent_pairs)}")
     print(f"   - Child chunks: {len(all_child_chunks)}")
-    print(f"   - Vector database: qdrant_db/")
+    print(f"   - Vector database: {QDRANT_DB_PATH}/")
     print(f"   - Parent store: {PARENT_STORE_PATH}/")
     print("\n🎉 Your knowledge base is ready!")
     print("   Run 'python test_chat.py' to test the system.\n")
