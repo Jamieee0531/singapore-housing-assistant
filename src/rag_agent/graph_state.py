@@ -12,7 +12,7 @@ def accumulate_or_reset(existing: List[dict], new: List[dict]) -> List[dict]:
     """
     Custom reducer for agent_answers.
     Allows resetting the list when a special '__reset__' marker is present.
-    
+
     This is used when starting a new conversation to clear previous answers.
     """
     if new and any(item.get('__reset__') for item in new):
@@ -20,27 +20,39 @@ def accumulate_or_reset(existing: List[dict], new: List[dict]) -> List[dict]:
     return existing + new
 
 
+def use_last_value(existing: str, new: str) -> str:
+    """
+    Simple reducer that always uses the latest value.
+    Used for fields like 'language' that may be set multiple times.
+    """
+    return new if new else existing
+
+
 class State(MessagesState):
     """
     Main state for the housing assistant graph.
-    
+
     Inherits from MessagesState to get message history management.
     Tracks conversation flow, query analysis, and aggregated answers.
     """
-    
+
+    # Language setting (with reducer to handle concurrent updates)
+    language: Annotated[str, use_last_value] = "en"
+    """User's selected language: 'en' for English, 'zh' for Chinese"""
+
     # Query analysis
     questionIsClear: bool = False
     """Whether the user's question is clear enough to process"""
-    
+
     conversation_summary: str = ""
     """Brief summary of recent conversation for context"""
-    
+
     originalQuery: str = ""
     """The user's original query before rewriting"""
-    
+
     rewrittenQuestions: List[str] = []
     """List of rewritten queries optimized for retrieval"""
-    
+
     # Agent answers (with custom reducer)
     agent_answers: Annotated[List[dict], accumulate_or_reset] = []
     """
@@ -52,20 +64,23 @@ class State(MessagesState):
 class AgentState(MessagesState):
     """
     State for individual agent subgraph.
-    
+
     Each agent processes one question independently.
     This state tracks the agent's execution for that single question.
     """
-    
+
+    language: Annotated[str, use_last_value] = "en"
+    """User's selected language: 'en' for English, 'zh' for Chinese"""
+
     question: str = ""
     """The specific question this agent is answering"""
-    
+
     question_index: int = 0
     """Index of this question in the list of rewritten questions"""
-    
+
     final_answer: str = ""
     """The agent's final answer after retrieval and reasoning"""
-    
+
     agent_answers: List[dict] = []
     """
     The answer to be passed back to main graph.

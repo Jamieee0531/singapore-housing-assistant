@@ -19,6 +19,7 @@ from src.rag_agent.prompts import (
     get_rag_agent_prompt,
     get_aggregation_prompt
 )
+from src.i18n import get_language_instruction
 
 
 # =============================================================================
@@ -135,7 +136,7 @@ def human_input_node(state: State):
 def route_after_rewrite(state: State) -> Literal["human_input", "process_question"]:
     """
     Route based on whether question is clear.
-    
+
     Returns:
         - "human_input": Question unclear, wait for user input
         - List[Send]: Question clear, spawn agents for each sub-question
@@ -143,10 +144,12 @@ def route_after_rewrite(state: State) -> Literal["human_input", "process_questio
     if not state.get("questionIsClear", False):
         return "human_input"
     else:
+        language = state.get("language", "en")
         return [
             Send("process_question", {
                 "question": query,
                 "question_index": idx,
+                "language": language,
                 "messages": []
             })
             for idx, query in enumerate(state["rewrittenQuestions"])
@@ -160,21 +163,24 @@ def route_after_rewrite(state: State) -> Literal["human_input", "process_questio
 def agent_node(state: AgentState, llm_with_tools):
     """
     Main agent node that executes RAG workflow.
-    
+
     Args:
         state: Agent state with current question
         llm_with_tools: Language model with tools bound
-        
+
     Returns:
         Updated state with new messages
     """
-    sys_msg = SystemMessage(content=get_rag_agent_prompt())
-    
+    # Get language instruction based on user's language preference
+    language = state.get("language", "en")
+    language_instruction = get_language_instruction(language)
+    sys_msg = SystemMessage(content=get_rag_agent_prompt(language_instruction))
+
     if not state.get("messages"):
         human_msg = HumanMessage(content=state["question"])
         response = llm_with_tools.invoke([sys_msg] + [human_msg])
         return {"messages": [human_msg, response]}
-    
+
     return {"messages": [llm_with_tools.invoke([sys_msg] + state["messages"])]}
 
 

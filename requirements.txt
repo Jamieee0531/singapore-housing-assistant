@@ -18,6 +18,7 @@ pymupdf4llm==0.2.9
 
 python-dotenv==1.0.0
 pydantic==2.12.5
+googlemaps>=4.10.0
 
 gradio==6.3.0
 

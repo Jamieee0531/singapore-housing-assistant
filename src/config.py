@@ -17,6 +17,9 @@ load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
+# Google Maps API Key (for location/commute features)
+GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
+
 # Validation: Ensure at least one LLM API key is provided
 if not GOOGLE_API_KEY and not OPENAI_API_KEY:
     raise ValueError(
