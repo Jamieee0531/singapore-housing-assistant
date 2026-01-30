@@ -8,10 +8,13 @@ This script processes Markdown documents and creates a searchable knowledge base
 4. Indexes child chunks into Qdrant vector database
 
 Usage:
-    python indexing.py
+    python indexing.py              # Check if index exists, fail if so (safe default)
+    python indexing.py --rebuild    # Delete existing index and rebuild from scratch
+    python indexing.py --append     # Add new documents without deleting existing data
 """
 
 import os
+import argparse
 import glob
 from pathlib import Path
 from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
@@ -176,10 +179,14 @@ def clean_small_chunks(chunks, min_size):
     return cleaned
 
 
-def index_documents():
+def index_documents(mode: str = "default"):
     """
     Main indexing function that processes all documents.
-    
+
+    Args:
+        mode: Indexing mode - "default" (fail if exists), "rebuild" (delete and recreate),
+              or "append" (add new documents only)
+
     Steps:
     1. Initialize embeddings and vector store
     2. Read and process Markdown files
@@ -212,10 +219,22 @@ def index_documents():
     client = QdrantClient(path=QDRANT_DB_PATH)
     embedding_dimension = len(dense_embeddings.embed_query("test"))
     
-    # Clear existing collection if needed
-    if client.collection_exists(CHILD_COLLECTION):
-        print(f"⚠️  Removing existing collection: {CHILD_COLLECTION}")
-        client.delete_collection(CHILD_COLLECTION)
+    # Handle existing collection based on mode
+    collection_exists = client.collection_exists(CHILD_COLLECTION)
+
+    if collection_exists:
+        if mode == "default":
+            print(f"\n❌ Error: Index already exists!")
+            print(f"   Collection '{CHILD_COLLECTION}' found in {QDRANT_DB_PATH}/")
+            print(f"\nOptions:")
+            print(f"   python indexing.py --rebuild    # Delete and rebuild from scratch")
+            print(f"   python indexing.py --append     # Add new documents only")
+            return
+        elif mode == "rebuild":
+            print(f"⚠️  Rebuild mode: Removing existing collection '{CHILD_COLLECTION}'...")
+            client.delete_collection(CHILD_COLLECTION)
+        elif mode == "append":
+            print(f"📎 Append mode: Will add to existing collection '{CHILD_COLLECTION}'...")
     
     ensure_collection(client, CHILD_COLLECTION, embedding_dimension)
     
@@ -324,9 +343,10 @@ def index_documents():
         return
     
     print(f"💾 Saving {len(all_parent_pairs)} parent chunks to JSON...")
-    
+
     parent_manager = ParentStoreManager()
-    parent_manager.clear_store()  # Clear old data
+    if mode == "rebuild":
+        parent_manager.clear_store()  # Clear old data only in rebuild mode
     parent_manager.save_many(all_parent_pairs)
     
     print(f"✓ Parent chunks saved to: {PARENT_STORE_PATH}\n")
@@ -366,8 +386,35 @@ def index_documents():
 
 
 if __name__ == "__main__":
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description="Index documents for Singapore Housing Assistant RAG System"
+    )
+    parser.add_argument(
+        "--rebuild",
+        action="store_true",
+        help="Delete existing index and rebuild from scratch"
+    )
+    parser.add_argument(
+        "--append",
+        action="store_true",
+        help="Add new documents without deleting existing data"
+    )
+    args = parser.parse_args()
+
+    # Determine mode
+    if args.rebuild and args.append:
+        print("❌ Error: Cannot use --rebuild and --append together")
+        exit(1)
+    elif args.rebuild:
+        mode = "rebuild"
+    elif args.append:
+        mode = "append"
+    else:
+        mode = "default"
+
     try:
-        index_documents()
+        index_documents(mode=mode)
     except KeyboardInterrupt:
         print("\n\n⚠️  Indexing interrupted by user")
     except Exception as e:

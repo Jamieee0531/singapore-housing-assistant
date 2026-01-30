@@ -95,14 +95,20 @@ def analyze_and_rewrite_query(state: State, llm):
     ])
 
     if len(response.questions) > 0 and response.is_clear:
-        delete_all = [
-            RemoveMessage(id=m.id)
-            for m in state["messages"]
-            if not isinstance(m, SystemMessage)
-        ]
+        # Only delete messages if we have a conversation summary to preserve context
+        # If no summary exists, keep messages as context for follow-up questions
+        if conversation_summary.strip():
+            messages_update = [
+                RemoveMessage(id=m.id)
+                for m in state["messages"]
+                if not isinstance(m, SystemMessage)
+            ]
+        else:
+            messages_update = []  # Keep messages when no summary exists
+
         return {
             "questionIsClear": True,
-            "messages": delete_all,
+            "messages": messages_update,
             "originalQuery": last_message.content,
             "rewrittenQuestions": response.questions
         }
