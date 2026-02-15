@@ -10,6 +10,7 @@ Google Maps 工具模块 - 提供位置、通勤和周边搜索功能
 from typing import List
 from langchain_core.tools import tool
 import googlemaps
+from src.config import MAPS_SEARCH_RADIUS, MAPS_MAX_RESULTS
 
 
 # 新加坡常见地点缩写映射
@@ -256,12 +257,12 @@ class MapsToolFactory:
                 # 搜索附近设施
                 places_result = client.places_nearby(
                     location=(lat, lng),
-                    radius=1000,  # 1公里范围
+                    radius=MAPS_SEARCH_RADIUS,
                     type=search_type
                 )
 
                 if not places_result.get("results"):
-                    return f"在 {location} 附近1公里内未找到 {place_type}。"
+                    return f"在 {location} 附近{MAPS_SEARCH_RADIUS}米内未找到 {place_type}。"
 
                 # 格式化结果
                 type_names = {
@@ -278,7 +279,7 @@ class MapsToolFactory:
                 type_name = type_names.get(search_type, place_type)
 
                 places_list = []
-                for place in places_result["results"][:8]:  # 最多显示8个
+                for place in places_result["results"][:MAPS_MAX_RESULTS]:
                     name = place["name"]
                     rating = place.get("rating", "无评分")
                     vicinity = place.get("vicinity", "")
@@ -288,11 +289,11 @@ class MapsToolFactory:
                     else:
                         places_list.append(f"  - {name}\n    地址: {vicinity}")
 
-                response = f"""{location} 附近的{type_name}（1公里范围内）：
+                response = f"""{location} 附近的{type_name}（{MAPS_SEARCH_RADIUS}米范围内）：
 
 {chr(10).join(places_list)}
 
-共找到 {len(places_result['results'])} 个结果，以上为前 {min(8, len(places_result['results']))} 个。"""
+共找到 {len(places_result['results'])} 个结果，以上为前 {min(MAPS_MAX_RESULTS, len(places_result['results']))} 个。"""
 
                 return response
 

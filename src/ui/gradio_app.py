@@ -5,8 +5,11 @@ This module provides a web-based chat interface using Gradio.
 Supports English and Chinese languages.
 """
 
+import logging
 import uuid
 import gradio as gr
+
+logger = logging.getLogger(__name__)
 from langchain_core.messages import HumanMessage
 
 from src.config import (
@@ -86,9 +89,9 @@ class ChatSession:
                 maps_factory = MapsToolFactory(GOOGLE_MAPS_API_KEY)
                 maps_tools = maps_factory.create_tools()
                 tools.extend(maps_tools)
-                print("✓ Google Maps tools loaded")
+                logger.info("Google Maps tools loaded")
             except Exception as e:
-                print(f"⚠ Maps tools not loaded: {e}")
+                logger.warning("Maps tools not loaded: %s", e)
 
         self.agent_graph = create_agent_graph(llm, tools)
 

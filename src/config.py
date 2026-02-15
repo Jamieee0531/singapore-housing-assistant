@@ -3,6 +3,7 @@ Configuration module for Singapore Housing Assistant RAG System.
 Loads environment variables and defines all system configurations.
 """
 
+import logging
 import os
 from dotenv import load_dotenv
 
@@ -91,6 +92,15 @@ MAX_PARENT_RETRIEVAL = 3        # Max parent chunks to fetch per query
 # Query analysis
 QUERY_ANALYSIS_TEMPERATURE = 0.1  # Low temp for query rewriting
 
+# Google Maps settings
+MAPS_SEARCH_RADIUS = 1000          # Search radius in meters
+MAPS_MAX_RESULTS = 8               # Max nearby places to return
+
+# Conversation summarization
+SUMMARY_MIN_MESSAGES = 4           # Min messages before summarizing
+SUMMARY_LAST_N_MESSAGES = 6        # Last N messages to include in summary
+SUMMARY_TEMPERATURE = 0.2          # Temperature for summary generation
+
 # =============================================================================
 # System Settings
 # =============================================================================
@@ -122,20 +132,26 @@ def get_llm_config():
     else:
         raise ValueError(f"Unknown LLM provider: {LLM_PROVIDER}")
 
+def setup_logging():
+    """Configure logging based on LOG_LEVEL setting."""
+    logging.basicConfig(
+        level=getattr(logging, LOG_LEVEL, logging.INFO),
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
 def print_config():
     """Print current configuration (for debugging)."""
-    print("=" * 60)
-    print("🏠 Singapore Housing Assistant - Configuration")
-    print("=" * 60)
-    print(f"LLM Provider: {LLM_PROVIDER}")
-    print(f"LLM Model: {LLM_MODEL}")
-    print(f"Docs Directory: {DOCS_DIR}")
-    print(f"Qdrant DB Path: {QDRANT_DB_PATH}")
-    print(f"Child Collection: {CHILD_COLLECTION}")
-    print(f"Dense Model: {DENSE_MODEL}")
-    print(f"Child Chunk Size: {CHILD_CHUNK_SIZE}")
-    print(f"Parent Size Range: {MIN_PARENT_SIZE}-{MAX_PARENT_SIZE}")
-    print("=" * 60)
+    logger = logging.getLogger(__name__)
+    logger.info("Singapore Housing Assistant - Configuration")
+    logger.info("LLM Provider: %s", LLM_PROVIDER)
+    logger.info("LLM Model: %s", LLM_MODEL)
+    logger.info("Docs Directory: %s", DOCS_DIR)
+    logger.info("Qdrant DB Path: %s", QDRANT_DB_PATH)
+    logger.info("Child Collection: %s", CHILD_COLLECTION)
+    logger.info("Dense Model: %s", DENSE_MODEL)
+    logger.info("Child Chunk Size: %s", CHILD_CHUNK_SIZE)
+    logger.info("Parent Size Range: %s-%s", MIN_PARENT_SIZE, MAX_PARENT_SIZE)
 
 # =============================================================================
 # Auto-create directories on import

@@ -87,23 +87,21 @@ def merge_small_parents(chunks, min_size):
             current = chunk
         else:
             current.page_content += "\n\n" + chunk.page_content
+            # Keep first chunk's metadata (contains correct header hierarchy)
+            # Only add keys that don't already exist
             for k, v in chunk.metadata.items():
-                if k in current.metadata:
-                    current.metadata[k] = f"{current.metadata[k]} -> {v}"
-                else:
+                if k not in current.metadata:
                     current.metadata[k] = v
 
         if len(current.page_content) >= min_size:
             merged.append(current)
             current = None
-    
+
     if current:
         if merged:
             merged[-1].page_content += "\n\n" + current.page_content
             for k, v in current.metadata.items():
-                if k in merged[-1].metadata:
-                    merged[-1].metadata[k] = f"{merged[-1].metadata[k]} -> {v}"
-                else:
+                if k not in merged[-1].metadata:
                     merged[-1].metadata[k] = v
         else:
             merged.append(current)

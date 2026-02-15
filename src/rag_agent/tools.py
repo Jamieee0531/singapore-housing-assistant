@@ -8,6 +8,7 @@ Uses ToolFactory pattern for clean dependency injection.
 from typing import List
 from langchain_core.tools import tool
 from src.db import ParentStoreManager
+from src.config import TOP_K_CHILD_CHUNKS, SIMILARITY_THRESHOLD
 
 
 class ToolFactory:
@@ -26,7 +27,7 @@ class ToolFactory:
         self.collection = collection
         self.parent_store_manager = ParentStoreManager()
     
-    def _search_child_chunks(self, query: str, limit: int = 7) -> str:
+    def _search_child_chunks(self, query: str, limit: int = TOP_K_CHILD_CHUNKS) -> str:
         """
         Search for the top K most relevant child chunks.
         
@@ -50,9 +51,9 @@ class ToolFactory:
         try:
             # Perform hybrid search with similarity threshold
             results = self.collection.similarity_search(
-                query, 
-                k=limit, 
-                score_threshold=0.7
+                query,
+                k=limit,
+                score_threshold=SIMILARITY_THRESHOLD
             )
             
             if not results:

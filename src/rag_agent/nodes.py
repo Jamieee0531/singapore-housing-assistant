@@ -19,6 +19,12 @@ from src.rag_agent.prompts import (
     get_rag_agent_prompt,
     get_aggregation_prompt
 )
+from src.config import (
+    QUERY_ANALYSIS_TEMPERATURE,
+    SUMMARY_MIN_MESSAGES,
+    SUMMARY_LAST_N_MESSAGES,
+    SUMMARY_TEMPERATURE,
+)
 from src.i18n import get_language_instruction
 
 
@@ -37,7 +43,7 @@ def analyze_chat_and_summarize(state: State, llm):
     Returns:
         Updated state with conversation_summary and reset agent_answers
     """
-    if len(state["messages"]) < 4:
+    if len(state["messages"]) < SUMMARY_MIN_MESSAGES:
         return {"conversation_summary": ""}
     
     relevant_msgs = [
@@ -50,11 +56,11 @@ def analyze_chat_and_summarize(state: State, llm):
         return {"conversation_summary": ""}
     
     conversation = "Conversation history:\n"
-    for msg in relevant_msgs[-6:]:
+    for msg in relevant_msgs[-SUMMARY_LAST_N_MESSAGES:]:
         role = "User" if isinstance(msg, HumanMessage) else "Assistant"
         conversation += f"{role}: {msg.content}\n"
 
-    summary_response = llm.with_config(temperature=0.2).invoke([
+    summary_response = llm.with_config(temperature=SUMMARY_TEMPERATURE).invoke([
         SystemMessage(content=get_conversation_summary_prompt()),
         HumanMessage(content=conversation)
     ])
@@ -88,7 +94,7 @@ def analyze_and_rewrite_query(state: State, llm):
         if conversation_summary.strip() else ""
     ) + f"User Query:\n{last_message.content}\n"
 
-    llm_with_structure = llm.with_config(temperature=0.1).with_structured_output(QueryAnalysis)
+    llm_with_structure = llm.with_config(temperature=QUERY_ANALYSIS_TEMPERATURE).with_structured_output(QueryAnalysis)
     response = llm_with_structure.invoke([
         SystemMessage(content=get_query_analysis_prompt()),
         HumanMessage(content=context_section)

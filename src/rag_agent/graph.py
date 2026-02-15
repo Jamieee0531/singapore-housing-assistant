@@ -6,8 +6,11 @@ Builds the main LangGraph workflow with:
 - Main graph for conversation management and query processing
 """
 
+import logging
 from functools import partial
 from langgraph.graph import START, END, StateGraph
+
+logger = logging.getLogger(__name__)
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.prebuilt import ToolNode, tools_condition
 
@@ -96,6 +99,6 @@ def create_agent_graph(llm, tools_list):
         interrupt_before=["human_input"]  # Pause for unclear queries
     )
     
-    print("✓ Agent graph compiled successfully\n")
+    logger.info("Agent graph compiled successfully")
     
     return agent_graph

@@ -7,8 +7,11 @@ Usage:
 Then open http://localhost:7860 in your browser.
 """
 
+import logging
 import os
 import sys
+
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -20,26 +23,26 @@ def main():
         print("See .env.example for reference.\n")
         sys.exit(1)
 
-    print("\nStarting Singapore Housing Assistant...")
-    print("Loading models and initializing system...\n")
+    from src.config import setup_logging
+    setup_logging()
+
+    logger.info("Starting Singapore Housing Assistant...")
+    logger.info("Loading models and initializing system...")
 
     try:
         from src.ui.gradio_app import create_gradio_app, get_session
 
         # Pre-initialize the session to show loading progress
-        print("Initializing RAG system...")
+        logger.info("Initializing RAG system...")
         session = get_session()
         session.initialize()
-        print("System ready!\n")
+        logger.info("System ready!")
 
         # Create and launch app
         app = create_gradio_app()
 
-        print("=" * 50)
-        print("Singapore Housing Assistant is running!")
-        print("Open http://localhost:7860 in your browser")
-        print("Press Ctrl+C to stop")
-        print("=" * 50 + "\n")
+        logger.info("Singapore Housing Assistant is running!")
+        logger.info("Open http://localhost:7860 in your browser")
 
         app.launch(
             server_name="0.0.0.0",
@@ -49,11 +52,9 @@ def main():
         )
 
     except KeyboardInterrupt:
-        print("\n\nShutting down...")
+        logger.info("Shutting down...")
     except Exception as e:
-        print(f"\nError: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error("Error: %s", e, exc_info=True)
         sys.exit(1)
 
 

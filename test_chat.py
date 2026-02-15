@@ -14,7 +14,7 @@ Commands:
 import os
 from langchain_core.messages import HumanMessage
 
-from src.config import get_llm_config, CHILD_COLLECTION, QDRANT_DB_PATH
+from src.config import get_llm_config, setup_logging, CHILD_COLLECTION, QDRANT_DB_PATH
 from src.rag_agent.tools import ToolFactory
 from src.rag_agent.graph import create_agent_graph
 
@@ -189,6 +189,7 @@ def chat_loop(agent_graph, config):
 
 def main():
     """Main entry point."""
+    setup_logging()
     try:
         # Check if .env file exists
         if not os.path.exists('.env'):
