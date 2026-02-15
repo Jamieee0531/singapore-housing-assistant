@@ -2,15 +2,17 @@
 Gradio Chat Interface for Singapore Housing Assistant.
 
 This module provides a web-based chat interface using Gradio.
-Supports English and Chinese languages.
+Supports English and Chinese languages with token-level streaming output.
 """
 
 import logging
 import uuid
+from typing import AsyncGenerator
+
 import gradio as gr
 
 logger = logging.getLogger(__name__)
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 
 from src.config import (
     get_llm_config,
@@ -31,6 +33,22 @@ if LLM_PROVIDER == "gemini":
     from langchain_google_genai import ChatGoogleGenerativeAI
 else:
     from langchain_openai import ChatOpenAI
+
+# Node name to user-facing progress message mapping
+NODE_PROGRESS = {
+    "en": {
+        "summarize": "Analyzing conversation...",
+        "analyze_rewrite": "Understanding your question...",
+        "process_question": "Searching knowledge base...",
+        "aggregate": "Generating answer...",
+    },
+    "zh": {
+        "summarize": "分析对话中...",
+        "analyze_rewrite": "理解您的问题...",
+        "process_question": "搜索知识库...",
+        "aggregate": "生成回答...",
+    },
+}
 
 
 class ChatSession:
@@ -105,7 +123,7 @@ class ChatSession:
 
     def chat(self, message: str, language: Language = "en") -> str:
         """
-        Process a user message and return the assistant's response.
+        Process a user message and return the assistant's response (blocking).
 
         Args:
             message: User's input message
@@ -118,18 +136,15 @@ class ChatSession:
             self.initialize()
 
         try:
-            # Check if graph is waiting for input
             current_state = self.agent_graph.get_state(self.config)
 
             if current_state.next:
-                # Resume from interruption
                 self.agent_graph.update_state(
                     self.config,
                     {"messages": [HumanMessage(content=message)], "language": language}
                 )
                 result = self.agent_graph.invoke(None, self.config)
             else:
-                # New query with language setting
                 result = self.agent_graph.invoke(
                     {"messages": [HumanMessage(content=message)], "language": language},
                     self.config
@@ -139,6 +154,94 @@ class ChatSession:
 
         except Exception as e:
             return f"Error: {str(e)}"
+
+    async def chat_stream(
+        self, message: str, language: Language = "en"
+    ) -> AsyncGenerator[tuple[str, str], None]:
+        """
+        Streaming chat using astream_events.
+
+        Yields (status, accumulated_content) tuples where:
+        - status: progress indicator (node name or empty when streaming tokens)
+        - accumulated_content: the text to display (progress message or growing answer)
+
+        Args:
+            message: User's input message
+            language: Response language ('en' or 'zh')
+        """
+        if not self.initialized:
+            self.initialize()
+
+        progress_map = NODE_PROGRESS.get(language, NODE_PROGRESS["en"])
+
+        try:
+            current_state = self.agent_graph.get_state(self.config)
+            is_resuming = bool(current_state.next)
+
+            if is_resuming:
+                self.agent_graph.update_state(
+                    self.config,
+                    {"messages": [HumanMessage(content=message)], "language": language}
+                )
+                stream_input = None
+            else:
+                stream_input = {
+                    "messages": [HumanMessage(content=message)],
+                    "language": language,
+                }
+
+            accumulated = ""
+            is_streaming_tokens = False
+
+            async for event in self.agent_graph.astream_events(
+                stream_input, config=self.config, version="v2"
+            ):
+                kind = event.get("event", "")
+                name = event.get("name", "")
+                tags = event.get("tags", [])
+
+                # Node-level progress: show status when a node starts
+                if kind == "on_chain_start" and name in progress_map:
+                    status_msg = progress_map[name]
+                    if not is_streaming_tokens:
+                        yield status_msg, ""
+
+                # Token streaming from the aggregate LLM only
+                if (
+                    kind == "on_chat_model_stream"
+                    and "aggregate_llm" in tags
+                ):
+                    is_streaming_tokens = True
+                    chunk = event.get("data", {}).get("chunk")
+                    if chunk and hasattr(chunk, "content") and chunk.content:
+                        accumulated += chunk.content
+                        yield "", accumulated
+
+            # If no tokens were streamed, the graph was likely interrupted
+            # (unclear question at human_input node) or completed without aggregate.
+            if not accumulated:
+                final_state = self.agent_graph.get_state(self.config)
+
+                if final_state.next:
+                    # Graph paused at interrupt (human_input node)
+                    messages = final_state.values.get("messages", [])
+                    for msg in reversed(messages):
+                        if isinstance(msg, AIMessage) and msg.content:
+                            yield "", msg.content
+                            return
+                    yield "", "Could you please clarify your question?"
+                else:
+                    # Graph completed but no streaming tokens captured
+                    messages = final_state.values.get("messages", [])
+                    for msg in reversed(messages):
+                        if isinstance(msg, AIMessage) and msg.content:
+                            yield "", msg.content
+                            return
+                    yield "", "No response generated."
+
+        except Exception as e:
+            logger.exception("Streaming error")
+            yield "", f"Error: {str(e)}"
 
 
 # Global session instance
@@ -224,20 +327,26 @@ def create_gradio_app() -> gr.Blocks:
             history = history + [{"role": "user", "content": user_message}]
             return "", history
 
-        def bot_respond(history, lang):
-            """Generate bot response."""
-            if not history:
-                return history
-
-            # Check if last message is from user (needs response)
-            if history[-1]["role"] != "user":
-                return history
+        async def bot_respond(history, lang):
+            """Generate bot response with token-level streaming."""
+            if not history or history[-1]["role"] != "user":
+                yield history
+                return
 
             user_message = history[-1]["content"]
             session = get_session()
-            response = session.chat(user_message, language=lang)
-            history = history + [{"role": "assistant", "content": response}]
-            return history
+
+            # Create base history with empty assistant message
+            base_history = history + [{"role": "assistant", "content": ""}]
+
+            async for status, content in session.chat_stream(user_message, language=lang):
+                if content:
+                    new_msg = {"role": "assistant", "content": content}
+                elif status:
+                    new_msg = {"role": "assistant", "content": f"⏳ {status}"}
+                else:
+                    continue
+                yield base_history[:-1] + [new_msg]
 
         def clear_chat(lang):
             """Clear the chat history and reset the session."""

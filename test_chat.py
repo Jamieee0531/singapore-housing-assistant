@@ -12,7 +12,7 @@ Commands:
 """
 
 import os
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 
 from src.config import get_llm_config, setup_logging, CHILD_COLLECTION, QDRANT_DB_PATH
 from src.rag_agent.tools import ToolFactory
@@ -118,65 +118,90 @@ def initialize_system():
     return agent_graph, config
 
 
+NODE_PROGRESS = {
+    "summarize": "📝 Analyzing conversation...",
+    "analyze_rewrite": "🔍 Understanding your question...",
+    "process_question": "📚 Searching knowledge base...",
+    "aggregate": "✨ Generating answer...",
+}
+
+
 def chat_loop(agent_graph, config):
     """
-    Main chat loop for interactive conversation.
-    
+    Main chat loop for interactive conversation with node-level progress.
+
     Args:
         agent_graph: Compiled LangGraph
         config: Configuration dict with thread_id
     """
     print_welcome()
-    
+
     while True:
         try:
             # Get user input
             user_input = input("You: ").strip()
-            
+
             if not user_input:
                 continue
-            
+
             # Handle commands
             if user_input.lower() in ['exit', 'quit', 'q']:
                 print("\n👋 Goodbye! Thanks for using Singapore Housing Assistant.\n")
                 break
-            
+
             if user_input.lower() == 'help':
                 print_help()
                 continue
-            
+
             if user_input.lower() == 'clear':
                 # Start new conversation
                 import uuid
                 config = {"configurable": {"thread_id": str(uuid.uuid4())}}
                 print("\n🔄 Started new conversation\n")
                 continue
-            
-            # Process query
-            print("\n🤔 Thinking...\n")
-            
+
+            print()
+
             # Check if graph is waiting for input (human-in-the-loop)
             current_state = agent_graph.get_state(config)
-            
+
             if current_state.next:
                 # Resume from interruption
                 agent_graph.update_state(
                     config,
                     {"messages": [HumanMessage(content=user_input)]}
                 )
-                result = agent_graph.invoke(None, config)
+                stream_input = None
             else:
-                # New query
-                result = agent_graph.invoke(
-                    {"messages": [HumanMessage(content=user_input)]},
-                    config
-                )
-            
+                stream_input = {"messages": [HumanMessage(content=user_input)]}
+
+            # Stream with node-level progress
+            last_response = None
+            for chunk in agent_graph.stream(stream_input, config, stream_mode="updates"):
+                for node_name, node_output in chunk.items():
+                    if node_name in NODE_PROGRESS:
+                        print(f"  {NODE_PROGRESS[node_name]}")
+
+                    # Capture the final response from aggregate node
+                    if node_name == "aggregate":
+                        messages = node_output.get("messages", [])
+                        if messages:
+                            last_response = messages[-1].content
+
             # Display response
-            assistant_message = result['messages'][-1].content
-            print(f"Assistant: {assistant_message}\n")
+            if last_response:
+                print(f"\nAssistant: {last_response}\n")
+            else:
+                # May have been interrupted (unclear question) — get state
+                final_state = agent_graph.get_state(config)
+                messages = final_state.values.get("messages", [])
+                for msg in reversed(messages):
+                    if isinstance(msg, AIMessage) and msg.content:
+                        print(f"\nAssistant: {msg.content}\n")
+                        break
+
             print("-" * 60 + "\n")
-            
+
         except KeyboardInterrupt:
             print("\n\n⚠️  Interrupted. Type 'exit' to quit.\n")
             continue

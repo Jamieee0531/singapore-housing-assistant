@@ -150,12 +150,15 @@ Response guidelines:
     return base_prompt
 
 
-def get_aggregation_prompt() -> str:
+def get_aggregation_prompt(language_instruction: str = "") -> str:
     """
     Prompt for combining multiple sub-answers into one coherent response.
     Used when query is split into multiple independent questions.
+
+    Args:
+        language_instruction: Optional instruction for response language
     """
-    return """You are an expert aggregation assistant for a Singapore housing rental system.
+    prompt = """You are an expert aggregation assistant for a Singapore housing rental system.
 
 Your task is to combine multiple retrieved answers into a single, comprehensive and natural response that flows well.
 
@@ -188,6 +191,10 @@ For students on a budget, HDB is recommended. If you value facilities and conven
 - hdb_vs_condo_guide.pdf
 - student_housing_tips.pdf"
 """
+    if language_instruction:
+        prompt += f"\n\nIMPORTANT: {language_instruction}"
+
+    return prompt
 
 
 def get_welcome_message() -> str:

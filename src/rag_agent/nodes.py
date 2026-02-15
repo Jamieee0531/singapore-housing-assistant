@@ -260,9 +260,12 @@ def aggregate_responses(state: State, llm):
         f"Retrieved answers:{formatted_answers}"
     ))
     
-    synthesis_response = llm.invoke([
-        SystemMessage(content=get_aggregation_prompt()),
-        user_message
-    ])
+    language = state.get("language", "en")
+    language_instruction = get_language_instruction(language)
+
+    synthesis_response = llm.invoke(
+        [SystemMessage(content=get_aggregation_prompt(language_instruction)), user_message],
+        config={"tags": ["aggregate_llm"]}
+    )
     
     return {"messages": [AIMessage(content=synthesis_response.content)]}
