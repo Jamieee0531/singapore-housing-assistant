@@ -7,12 +7,15 @@ Builds the main LangGraph workflow with:
 """
 
 import logging
+import sqlite3
 from functools import partial
 from langgraph.graph import START, END, StateGraph
+from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.prebuilt import ToolNode, tools_condition
+
+from src.config import CHECKPOINT_DB_PATH
 
 logger = logging.getLogger(__name__)
-from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.prebuilt import ToolNode, tools_condition
 
 from src.rag_agent.graph_state import State, AgentState
 from src.rag_agent.nodes import (
@@ -42,8 +45,9 @@ def create_agent_graph(llm, tools_list):
     llm_with_tools = llm.bind_tools(tools_list)
     tool_node = ToolNode(tools_list)
     
-    # Initialize checkpointer for conversation state persistence
-    checkpointer = InMemorySaver()
+    # Initialize checkpointer for conversation state persistence (SQLite)
+    conn = sqlite3.connect(CHECKPOINT_DB_PATH, check_same_thread=False)
+    checkpointer = SqliteSaver(conn)
     
     # =========================================================================
     # Build Agent Subgraph (handles individual question retrieval)

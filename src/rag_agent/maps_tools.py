@@ -1,19 +1,28 @@
 """
-Google Maps 工具模块 - 提供位置、通勤和周边搜索功能
+Google Maps tools for Singapore Housing Assistant.
 
-三个工具:
-1. get_commute_info - 计算通勤距离和时间
-2. get_directions - 获取详细路线指引
-3. search_nearby - 搜索附近设施
+Three tools:
+1. get_commute_info - Calculate commute distance and duration
+2. get_directions - Get detailed route directions
+3. search_nearby - Search for nearby amenities
 """
 
+import logging
+from functools import lru_cache
 from typing import List
 from langchain_core.tools import tool
 import googlemaps
-from src.config import MAPS_SEARCH_RADIUS, MAPS_MAX_RESULTS
+from src.rag_agent.base import BaseToolFactory, timed_tool
+from src.config import (
+    MAPS_SEARCH_RADIUS,
+    MAPS_MAX_RESULTS,
+    TOOL_ERROR_PREFIX,
+    TOOL_NO_RESULTS_PREFIX,
+)
 
+logger = logging.getLogger(__name__)
 
-# 新加坡常见地点缩写映射
+# Common Singapore location abbreviation mappings
 SINGAPORE_LOCATIONS = {
     "NUS": "National University of Singapore",
     "NTU": "Nanyang Technological University",
@@ -21,145 +30,182 @@ SINGAPORE_LOCATIONS = {
     "SUTD": "Singapore University of Technology and Design",
     "CBD": "Central Business District Singapore",
     "MBS": "Marina Bay Sands Singapore",
-    "Orchard": "Orchard Road Singapore",
+    "ORCHARD": "Orchard Road Singapore",
 }
 
 
 def _normalize_location(location: str) -> str:
     """
-    规范化地点名称，添加新加坡上下文
+    Normalize location names by expanding abbreviations and adding Singapore context.
 
-    - 识别 NUS/NTU 等缩写
-    - 自动添加 ", Singapore" 后缀
+    Args:
+        location: Raw location string (e.g., "NUS", "Clementi")
+
+    Returns:
+        Normalized location string with Singapore context
     """
-    # 检查是否是已知缩写
     upper_loc = location.upper().strip()
     if upper_loc in SINGAPORE_LOCATIONS:
         return SINGAPORE_LOCATIONS[upper_loc]
 
-    # 如果没有包含 Singapore，添加后缀
     if "singapore" not in location.lower():
         return f"{location}, Singapore"
 
     return location
 
 
-class MapsToolFactory:
+class MapsToolFactory(BaseToolFactory):
     """
-    Google Maps 工具工厂类
+    Factory for creating Google Maps tools.
 
-    使用方法:
+    Usage:
         factory = MapsToolFactory(api_key)
         tools = factory.create_tools()
     """
 
     def __init__(self, api_key: str):
         """
-        初始化 Maps 工具工厂
+        Initialize the Maps tool factory.
 
         Args:
             api_key: Google Maps API Key
         """
         self.client = googlemaps.Client(key=api_key)
+        self._init_cached_methods()
+
+    def _init_cached_methods(self):
+        """Create LRU-cached wrappers around Google Maps API calls."""
+
+        @lru_cache(maxsize=100)
+        def cached_distance_matrix(origin: str, destination: str, mode: str):
+            return self.client.distance_matrix(
+                origins=[origin], destinations=[destination],
+                mode=mode, region="sg"
+            )
+
+        @lru_cache(maxsize=100)
+        def cached_directions(origin: str, destination: str):
+            return self.client.directions(
+                origin=origin, destination=destination,
+                mode="transit", region="sg"
+            )
+
+        @lru_cache(maxsize=100)
+        def cached_geocode(location: str):
+            return self.client.geocode(location)
+
+        @lru_cache(maxsize=100)
+        def cached_places_nearby(lat: float, lng: float, radius: int, place_type: str):
+            return self.client.places_nearby(
+                location=(lat, lng), radius=radius, type=place_type
+            )
+
+        self._distance_matrix = cached_distance_matrix
+        self._directions = cached_directions
+        self._geocode = cached_geocode
+        self._places_nearby = cached_places_nearby
 
     def create_tools(self) -> List:
-        """创建并返回所有 Maps 工具"""
+        """Create and return all Maps tools."""
 
-        client = self.client
+        # Capture cached methods for use in tool closures
+        distance_matrix = self._distance_matrix
+        directions_api = self._directions
+        geocode = self._geocode
+        places_nearby = self._places_nearby
 
         @tool
         def get_commute_info(origin: str, destination: str) -> str:
             """
-            计算两地之间的通勤距离和时间。
+            Calculate commute distance and duration between two locations.
 
-            适用场景：
-            - "从金文泰到NUS要多久？"
-            - "Clementi 到 CBD 多远？"
-            - "住哪里离学校近？"
+            Use cases:
+            - "How long from Clementi to NUS?"
+            - "How far is Clementi from CBD?"
+            - "Which area is closest to my school?"
 
             Args:
-                origin: 出发地点（如 "Clementi", "金文泰"）
-                destination: 目的地点（如 "NUS", "CBD"）
+                origin: Starting location (e.g., "Clementi")
+                destination: Destination location (e.g., "NUS", "CBD")
 
             Returns:
-                包含距离和时间的通勤信息
+                Commute information with distance and duration for transit and driving.
+
+                On failure:
+                - "[NO_RESULTS] ..." if route cannot be calculated
+                - "[ERROR] ..." if API call fails
             """
             try:
-                # 规范化地点名称
                 origin_normalized = _normalize_location(origin)
                 destination_normalized = _normalize_location(destination)
 
-                # 获取公共交通路线
-                result = client.distance_matrix(
-                    origins=[origin_normalized],
-                    destinations=[destination_normalized],
-                    mode="transit",
-                    region="sg"
-                )
+                result = distance_matrix(origin_normalized, destination_normalized, "transit")
 
                 if result["rows"][0]["elements"][0]["status"] != "OK":
-                    return f"无法计算从 {origin} 到 {destination} 的路线，请检查地点名称是否正确。"
+                    logger.warning("Commute route not found: '%s' -> '%s'", origin, destination)
+                    return (
+                        f"{TOOL_NO_RESULTS_PREFIX} Could not calculate route from "
+                        f"{origin} to {destination}. Please check the location names."
+                    )
 
                 element = result["rows"][0]["elements"][0]
                 distance = element["distance"]["text"]
                 duration = element["duration"]["text"]
 
-                # 同时获取驾车时间作为参考
-                driving_result = client.distance_matrix(
-                    origins=[origin_normalized],
-                    destinations=[destination_normalized],
-                    mode="driving",
-                    region="sg"
-                )
+                driving_result = distance_matrix(origin_normalized, destination_normalized, "driving")
 
                 driving_duration = ""
                 if driving_result["rows"][0]["elements"][0]["status"] == "OK":
                     driving_duration = driving_result["rows"][0]["elements"][0]["duration"]["text"]
 
-                response = f"""从 {origin} 到 {destination} 的通勤信息：
+                response = f"""Commute from {origin} to {destination}:
 
-公共交通：
-  - 距离: {distance}
-  - 时间: {duration}
+Public Transit:
+  - Distance: {distance}
+  - Duration: {duration}
 
-驾车参考: {driving_duration if driving_duration else '无法获取'}
+Driving: {driving_duration if driving_duration else 'N/A'}
 
-提示: 新加坡公共交通非常发达，MRT是最常用的通勤方式。"""
+Tip: Singapore has excellent public transit; MRT is the most common commute option."""
 
                 return response
 
             except Exception as e:
-                return f"获取通勤信息时出错: {str(e)}。请确保地点名称正确。"
+                logger.error("Commute info lookup failed: %s", e, exc_info=True)
+                return f"{TOOL_ERROR_PREFIX} Commute info lookup failed: {e}"
 
         @tool
         def get_directions(origin: str, destination: str) -> str:
             """
-            获取从出发地到目的地的详细路线指引。
+            Get detailed step-by-step directions from origin to destination.
 
-            适用场景：
-            - "从金文泰到学校怎么走？"
-            - "怎么从 Jurong East 去 NUS？"
+            Use cases:
+            - "How do I get from Clementi to school?"
+            - "How to go from Jurong East to NUS?"
 
             Args:
-                origin: 出发地点
-                destination: 目的地点
+                origin: Starting location
+                destination: Destination location
 
             Returns:
-                详细的路线步骤说明
+                Detailed route steps with distance and duration.
+
+                On failure:
+                - "[NO_RESULTS] ..." if directions cannot be found
+                - "[ERROR] ..." if API call fails
             """
             try:
                 origin_normalized = _normalize_location(origin)
                 destination_normalized = _normalize_location(destination)
 
-                directions = client.directions(
-                    origin=origin_normalized,
-                    destination=destination_normalized,
-                    mode="transit",
-                    region="sg"
-                )
+                directions = directions_api(origin_normalized, destination_normalized)
 
                 if not directions:
-                    return f"无法获取从 {origin} 到 {destination} 的路线，请检查地点名称。"
+                    logger.warning("Directions not found: '%s' -> '%s'", origin, destination)
+                    return (
+                        f"{TOOL_NO_RESULTS_PREFIX} Could not find directions from "
+                        f"{origin} to {destination}. Please check the location names."
+                    )
 
                 route = directions[0]
                 legs = route["legs"][0]
@@ -170,7 +216,6 @@ class MapsToolFactory:
                 steps_text = []
                 for i, step in enumerate(legs["steps"], 1):
                     instruction = step["html_instructions"]
-                    # 清理 HTML 标签
                     instruction = instruction.replace("<b>", "").replace("</b>", "")
                     instruction = instruction.replace("<div style=\"font-size:0.9em\">", " - ")
                     instruction = instruction.replace("</div>", "")
@@ -184,62 +229,69 @@ class MapsToolFactory:
                         line = transit_details.get("line", {})
                         line_name = line.get("short_name", line.get("name", ""))
                         if line_name:
-                            instruction = f"乘坐 {line_name} - {instruction}"
+                            instruction = f"Take {line_name} - {instruction}"
                     elif travel_mode == "WALKING":
-                        instruction = f"步行: {instruction}"
+                        instruction = f"Walk: {instruction}"
 
                     steps_text.append(f"{i}. {instruction} ({step_distance}, {step_duration})")
 
-                response = f"""从 {origin} 到 {destination} 的路线：
+                response = f"""Directions from {origin} to {destination}:
 
-总距离: {total_distance}
-预计时间: {total_duration}
+Total distance: {total_distance}
+Estimated time: {total_duration}
 
-详细步骤:
+Steps:
 {chr(10).join(steps_text)}
 
-提示: 可使用 Google Maps 或 Citymapper 应用获取实时导航。"""
+Tip: Use Google Maps or Citymapper app for real-time navigation."""
 
                 return response
 
             except Exception as e:
-                return f"获取路线时出错: {str(e)}。请确保地点名称正确。"
+                logger.error("Directions lookup failed: %s", e, exc_info=True)
+                return f"{TOOL_ERROR_PREFIX} Directions lookup failed: {e}"
 
         @tool
         def search_nearby(location: str, place_type: str = "transit_station") -> str:
             """
-            搜索指定地点附近的设施。
+            Search for amenities near a specified location.
 
-            适用场景：
-            - "Clementi 附近有什么 MRT？"
-            - "这个地方周围有超市吗？"
-            - "附近有什么好吃的？"
+            Use cases:
+            - "Any MRT near Clementi?"
+            - "Are there supermarkets around this area?"
+            - "Any good restaurants nearby?"
 
             Args:
-                location: 搜索中心位置（如 "Clementi", "Jurong East"）
-                place_type: 设施类型，可选值:
-                    - "transit_station" (MRT/公交站，默认)
-                    - "supermarket" (超市)
-                    - "restaurant" (餐厅)
-                    - "shopping_mall" (商场)
-                    - "hospital" (医院)
-                    - "school" (学校)
+                location: Center location for search (e.g., "Clementi", "Jurong East")
+                place_type: Type of amenity, options:
+                    - "transit_station" (MRT/bus stops, default)
+                    - "supermarket"
+                    - "restaurant"
+                    - "shopping_mall"
+                    - "hospital"
+                    - "school"
 
             Returns:
-                附近设施列表
+                List of nearby amenities with names, ratings, and addresses.
+
+                On failure:
+                - "[NO_RESULTS] ..." if location not found or no results
+                - "[ERROR] ..." if API call fails
             """
             try:
                 location_normalized = _normalize_location(location)
 
-                # 先地理编码获取坐标
-                geocode_result = client.geocode(location_normalized)
+                geocode_result = geocode(location_normalized)
                 if not geocode_result:
-                    return f"无法找到地点: {location}，请检查名称是否正确。"
+                    logger.warning("Geocode failed for location: '%s'", location)
+                    return (
+                        f"{TOOL_NO_RESULTS_PREFIX} Could not geocode location: "
+                        f"{location}. Please check the name."
+                    )
 
                 lat = geocode_result[0]["geometry"]["location"]["lat"]
                 lng = geocode_result[0]["geometry"]["location"]["lng"]
 
-                # 设施类型映射
                 type_mapping = {
                     "transit_station": "transit_station",
                     "mrt": "transit_station",
@@ -254,26 +306,24 @@ class MapsToolFactory:
 
                 search_type = type_mapping.get(place_type.lower(), "transit_station")
 
-                # 搜索附近设施
-                places_result = client.places_nearby(
-                    location=(lat, lng),
-                    radius=MAPS_SEARCH_RADIUS,
-                    type=search_type
-                )
+                places_result = places_nearby(lat, lng, MAPS_SEARCH_RADIUS, search_type)
 
                 if not places_result.get("results"):
-                    return f"在 {location} 附近{MAPS_SEARCH_RADIUS}米内未找到 {place_type}。"
+                    logger.warning("No %s found near '%s' (radius=%dm)", place_type, location, MAPS_SEARCH_RADIUS)
+                    return (
+                        f"{TOOL_NO_RESULTS_PREFIX} No {place_type} found within "
+                        f"{MAPS_SEARCH_RADIUS}m of {location}."
+                    )
 
-                # 格式化结果
                 type_names = {
-                    "transit_station": "交通站点",
-                    "supermarket": "超市",
-                    "restaurant": "餐厅",
-                    "shopping_mall": "商场",
-                    "hospital": "医院",
-                    "school": "学校",
-                    "gym": "健身房",
-                    "park": "公园",
+                    "transit_station": "Transit Stations",
+                    "supermarket": "Supermarkets",
+                    "restaurant": "Restaurants",
+                    "shopping_mall": "Shopping Malls",
+                    "hospital": "Hospitals",
+                    "school": "Schools",
+                    "gym": "Gyms",
+                    "park": "Parks",
                 }
 
                 type_name = type_names.get(search_type, place_type)
@@ -281,23 +331,24 @@ class MapsToolFactory:
                 places_list = []
                 for place in places_result["results"][:MAPS_MAX_RESULTS]:
                     name = place["name"]
-                    rating = place.get("rating", "无评分")
+                    rating = place.get("rating")
                     vicinity = place.get("vicinity", "")
 
-                    if rating != "无评分":
-                        places_list.append(f"  - {name} (评分:{rating})\n    地址: {vicinity}")
+                    if rating:
+                        places_list.append(f"  - {name} (Rating: {rating})\n    Address: {vicinity}")
                     else:
-                        places_list.append(f"  - {name}\n    地址: {vicinity}")
+                        places_list.append(f"  - {name}\n    Address: {vicinity}")
 
-                response = f"""{location} 附近的{type_name}（{MAPS_SEARCH_RADIUS}米范围内）：
+                response = f"""{type_name} near {location} (within {MAPS_SEARCH_RADIUS}m):
 
 {chr(10).join(places_list)}
 
-共找到 {len(places_result['results'])} 个结果，以上为前 {min(MAPS_MAX_RESULTS, len(places_result['results']))} 个。"""
+Found {len(places_result['results'])} results, showing top {min(MAPS_MAX_RESULTS, len(places_result['results']))}."""
 
                 return response
 
             except Exception as e:
-                return f"搜索附近设施时出错: {str(e)}。请确保地点名称正确。"
+                logger.error("Nearby search failed: %s", e, exc_info=True)
+                return f"{TOOL_ERROR_PREFIX} Nearby search failed: {e}"
 
         return [get_commute_info, get_directions, search_nearby]

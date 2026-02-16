@@ -5,12 +5,22 @@ Based on the original agentic-rag-for-dummies project.
 Manages JSON file-based storage of parent chunks.
 """
 
+import logging
 import re
 import json
 import shutil
+from functools import lru_cache
 from pathlib import Path
 from typing import List, Dict
 from src.config import PARENT_STORE_PATH
+
+logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=128)
+def _read_json_file(file_path: str) -> Dict:
+    """Read and cache a JSON file. Cached by file path."""
+    return json.loads(Path(file_path).read_text(encoding="utf-8"))
 
 
 class ParentStoreManager:
@@ -65,18 +75,18 @@ class ParentStoreManager:
     
     def load(self, parent_id: str) -> Dict:
         """
-        Load raw parent chunk data from disk.
-        
+        Load raw parent chunk data from disk (cached).
+
         Args:
             parent_id: Parent chunk ID (with or without .json extension)
-            
+
         Returns:
             Dictionary with 'page_content' and 'metadata' keys
         """
         file_path = self.__store_path / (
             parent_id if parent_id.lower().endswith(".json") else f"{parent_id}.json"
         )
-        return json.loads(file_path.read_text(encoding="utf-8"))
+        return _read_json_file(str(file_path))
     
     def load_content(self, parent_id: str) -> Dict:
         """
@@ -129,12 +139,13 @@ class ParentStoreManager:
     
     def clear_store(self) -> None:
         """
-        Clear all parent chunks from storage.
-        
+        Clear all parent chunks from storage and invalidate cache.
+
         Useful for:
         - Re-indexing documents from scratch
         - Testing and cleanup
         """
+        _read_json_file.cache_clear()
         if self.__store_path.exists():
             shutil.rmtree(self.__store_path)
         self.__store_path.mkdir(parents=True, exist_ok=True)

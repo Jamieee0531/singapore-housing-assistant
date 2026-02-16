@@ -21,7 +21,8 @@ from src.config import (
     DENSE_MODEL,
     SPARSE_MODEL,
     LLM_PROVIDER,
-    GOOGLE_MAPS_API_KEY
+    GOOGLE_MAPS_API_KEY,
+    THREAD_ID_PATH,
 )
 from src.rag_agent.tools import ToolFactory
 from src.rag_agent.maps_tools import MapsToolFactory
@@ -49,6 +50,26 @@ NODE_PROGRESS = {
         "aggregate": "生成回答...",
     },
 }
+
+
+def _load_or_create_thread_id() -> str:
+    """Load persisted thread ID from file, or create a new one."""
+    try:
+        with open(THREAD_ID_PATH, "r") as f:
+            thread_id = f.read().strip()
+            if thread_id:
+                return thread_id
+    except FileNotFoundError:
+        pass
+    return _save_new_thread_id()
+
+
+def _save_new_thread_id() -> str:
+    """Generate a new thread ID and persist it to file."""
+    thread_id = str(uuid.uuid4())
+    with open(THREAD_ID_PATH, "w") as f:
+        f.write(thread_id)
+    return thread_id
 
 
 class ChatSession:
@@ -113,13 +134,17 @@ class ChatSession:
 
         self.agent_graph = create_agent_graph(llm, tools)
 
-        # Create conversation config
-        self.config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+        # Load or create persisted thread ID
+        thread_id = _load_or_create_thread_id()
+        self.config = {"configurable": {"thread_id": thread_id}}
+        logger.info("Session initialized with thread_id: %s", thread_id)
         self.initialized = True
 
     def reset(self):
-        """Reset the conversation session."""
-        self.config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+        """Reset the conversation session with a new thread ID."""
+        thread_id = _save_new_thread_id()
+        self.config = {"configurable": {"thread_id": thread_id}}
+        logger.info("Session reset with new thread_id: %s", thread_id)
 
     def chat(self, message: str, language: Language = "en") -> str:
         """

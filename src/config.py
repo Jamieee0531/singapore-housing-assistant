@@ -37,6 +37,8 @@ DOCS_DIR = "docs"                           # Original PDF/MD documents
 MARKDOWN_DIR = "markdown"                    # PDF converted to markdown
 PARENT_STORE_PATH = "parent_store"          # Parent chunk JSON storage
 QDRANT_DB_PATH = "qdrant_db"                # Qdrant local database
+CHECKPOINT_DB_PATH = "checkpoints.db"       # SQLite checkpoint database
+THREAD_ID_PATH = "thread_id.txt"            # Persisted conversation thread ID
 
 # =============================================================================
 # Qdrant Vector Database Configuration
@@ -100,6 +102,13 @@ MAPS_MAX_RESULTS = 8               # Max nearby places to return
 SUMMARY_MIN_MESSAGES = 4           # Min messages before summarizing
 SUMMARY_LAST_N_MESSAGES = 6        # Last N messages to include in summary
 SUMMARY_TEMPERATURE = 0.2          # Temperature for summary generation
+
+# =============================================================================
+# Tool Error Message Prefixes
+# =============================================================================
+
+TOOL_ERROR_PREFIX = "[ERROR]"
+TOOL_NO_RESULTS_PREFIX = "[NO_RESULTS]"
 
 # =============================================================================
 # System Settings
