@@ -1,0 +1,130 @@
+[
+    {
+        "id": "single_01",
+        "question": "What is the difference between HDB and Condo?",
+        "expected_answer": "HDB flats are government-built public housing, more affordable at $600-1,200/month for a room. Condos are private developments with premium facilities like pools and gyms, costing $1,000-2,200/month for a room.",
+        "relevant_sources": ["hdb_vs_condo.md"],
+        "category": "single_doc",
+        "language": "en"
+    },
+    {
+        "id": "single_02",
+        "question": "How do I open an SP Services account for utilities?",
+        "expected_answer": "Apply online via SP Utilities App with Singpass, or in person at SP Customer Service Centre. Security deposit is $40-200+, activation takes about 7 working days.",
+        "relevant_sources": ["utilities_setup.md", "rental_guide.md"],
+        "category": "single_doc",
+        "language": "en"
+    },
+    {
+        "id": "single_03",
+        "question": "How do I verify if a property agent is legitimate in Singapore?",
+        "expected_answer": "Check the agent's name and registration number on the CEA Public Register at cea.gov.sg. Make sure their contact details match. Never pay before viewing in person.",
+        "relevant_sources": ["rental_scams.md", "rental_guide.md"],
+        "category": "single_doc",
+        "language": "en"
+    },
+    {
+        "id": "single_04",
+        "question": "What MRT lines are there in Singapore and how much does it cost?",
+        "expected_answer": "Singapore has 6 MRT lines. Adult fares are $0.92-2.20 by distance, student fares $0.42-0.59. Buy an EZ-Link card for $12. Free transfers within 45 minutes.",
+        "relevant_sources": ["transport_guide.md", "student_budget_tips.md"],
+        "category": "single_doc",
+        "language": "en"
+    },
+    {
+        "id": "single_05",
+        "question": "What is stamp duty for rental and how is it calculated?",
+        "expected_answer": "Stamp duty is 0.4% of total rent for the lease period. For example, $1,000/month x 12 months = $12,000 total, stamp duty would be $48.",
+        "relevant_sources": ["visa_housing_rules.md", "rental_guide.md"],
+        "category": "single_doc",
+        "language": "en"
+    },
+    {
+        "id": "single_06",
+        "question": "What areas are in the East region of Singapore for students?",
+        "expected_answer": "Tampines ($600-1,100/month), Bedok ($550-1,050/month), and Pasir Ris ($500-950/month, cheapest). Pasir Ris is closest to SUTD at 10-15 min.",
+        "relevant_sources": ["area_guide_east.md", "price_range.md", "student_budget_tips.md"],
+        "category": "single_doc",
+        "language": "en"
+    },
+    {
+        "id": "single_07",
+        "question": "How much does aircon cost per month in electricity?",
+        "expected_answer": "Running aircon 8 hours per night adds $50-100/month. Running it all day adds $150-250/month to your electricity bill.",
+        "relevant_sources": ["utilities_setup.md", "price_range.md"],
+        "category": "single_doc",
+        "language": "en"
+    },
+    {
+        "id": "cross_01",
+        "question": "I'm studying at NUS, where should I live and how much will it cost?",
+        "expected_answer": "Clementi is the top choice, 10-15 min by bus 96, rooms $700-1,300/month. Buona Vista is also good at $800-1,400/month, 5-10 min to NUS.",
+        "relevant_sources": ["area_guide_west.md", "price_range.md"],
+        "category": "cross_doc",
+        "language": "en"
+    },
+    {
+        "id": "cross_02",
+        "question": "What are the Student Pass requirements for renting an HDB flat?",
+        "expected_answer": "Student Pass must be valid for 6+ months. HDB minimum lease is 6 months, maximum 2 years. Landlord must get HDB approval.",
+        "relevant_sources": ["visa_housing_rules.md", "rental_scams.md", "hdb_vs_condo.md"],
+        "category": "cross_doc",
+        "language": "en"
+    },
+    {
+        "id": "cross_03",
+        "question": "I'm going to NTU, what are nearby housing options and how do I commute?",
+        "expected_answer": "Boon Lay/Jurong West is closest at $500-1,000/month, 15-25 min. Take East-West Line to Boon Lay or Pioneer station.",
+        "relevant_sources": ["area_guide_west.md", "transport_guide.md", "price_range.md"],
+        "category": "cross_doc",
+        "language": "en"
+    },
+    {
+        "id": "cross_04",
+        "question": "What is the student EZ-Link card and how much can I save on transport?",
+        "expected_answer": "Student EZ-Link card gives 30-50% discount on MRT fares. Student fare $0.42-0.59 vs adult $0.92-2.20. Monthly savings around $50-100.",
+        "relevant_sources": ["transport_guide.md", "student_budget_tips.md"],
+        "category": "cross_doc",
+        "language": "en"
+    },
+    {
+        "id": "zh_01",
+        "question": "租房合同必须包含哪些条款？",
+        "expected_answer": "必须包含双方姓名和身份证号、房屋地址、租金金额、押金金额、租期、终止条款。押金通常1-2个月租金。",
+        "relevant_sources": ["visa_housing_rules.md", "rental_guide.md", "rental_scams.md"],
+        "category": "chinese",
+        "language": "zh"
+    },
+    {
+        "id": "zh_02",
+        "question": "新加坡东部Tampines和Pasir Ris租房价格是多少？",
+        "expected_answer": "Tampines HDB普通房$600-850/月，Pasir Ris HDB普通房$500-750/月，是东部最便宜的区域。",
+        "relevant_sources": ["area_guide_east.md", "price_range.md"],
+        "category": "chinese",
+        "language": "zh"
+    },
+    {
+        "id": "zh_03",
+        "question": "新加坡中部Novena和Toa Payoh的租金是多少？",
+        "expected_answer": "Novena房间$900-2,000/月，Toa Payoh房间$750-1,400/月。Toa Payoh更便宜，有著名的小贩中心。",
+        "relevant_sources": ["area_guide_central.md", "price_range.md"],
+        "category": "chinese",
+        "language": "zh"
+    },
+    {
+        "id": "vague_01",
+        "question": "住哪最便宜",
+        "expected_answer": "Pasir Ris（$500-950/月）和Boon Lay/Jurong West（$500-1,000/月）是最便宜的区域。选HDB比Condo便宜$300-400/月。",
+        "relevant_sources": ["price_range.md", "student_budget_tips.md", "visa_housing_rules.md"],
+        "category": "vague",
+        "language": "zh"
+    },
+    {
+        "id": "oos_01",
+        "question": "How do I buy a property in Singapore as a foreigner?",
+        "expected_answer": "This question is outside the scope of the knowledge base.",
+        "relevant_sources": [],
+        "category": "out_of_scope",
+        "language": "en"
+    }
+]

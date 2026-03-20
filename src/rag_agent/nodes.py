@@ -26,6 +26,10 @@ from src.config import (
     SUMMARY_TEMPERATURE,
 )
 from src.i18n import get_language_instruction
+from src.db.redis_manager import RedisManager
+
+# Module-level Redis manager instance
+_redis_manager = RedisManager()
 
 
 # =============================================================================
@@ -43,8 +47,12 @@ def analyze_chat_and_summarize(state: State, llm):
     Returns:
         Updated state with conversation_summary and reset agent_answers
     """
+    # Load user profile from Redis (long-term memory) on every turn
+    user_id = state.get("user_id", "default")
+    user_profile = _redis_manager.load_profile(user_id).model_dump(exclude_none=True)
+
     if len(state["messages"]) < SUMMARY_MIN_MESSAGES:
-        return {"conversation_summary": ""}
+        return {"conversation_summary": "", "user_profile": user_profile}
     
     relevant_msgs = [
         msg for msg in state["messages"][:-1]
@@ -67,7 +75,8 @@ def analyze_chat_and_summarize(state: State, llm):
     
     return {
         "conversation_summary": summary_response.content,
-        "agent_answers": [{"__reset__": True}]
+        "agent_answers": [{"__reset__": True}],
+        "user_profile": user_profile
     }
 
 
@@ -94,11 +103,22 @@ def analyze_and_rewrite_query(state: State, llm):
         if conversation_summary.strip() else ""
     ) + f"User Query:\n{last_message.content}\n"
 
+    # Inject user profile context if available
+    user_profile = state.get("user_profile", {})
+    if user_profile:
+        profile_str = ", ".join(f"{k}: {v}" for k, v in user_profile.items() if v)
+        context_section = f"Known user preferences: {profile_str}\n" + context_section
+
     llm_with_structure = llm.with_config(temperature=QUERY_ANALYSIS_TEMPERATURE).with_structured_output(QueryAnalysis)
     response = llm_with_structure.invoke([
         SystemMessage(content=get_query_analysis_prompt()),
         HumanMessage(content=context_section)
     ])
+
+    # Save extracted preferences to Redis (long-term memory)
+    if response.extracted_preferences:
+        user_id = state.get("user_id", "default")
+        _redis_manager.update_profile(user_id, response.extracted_preferences)
 
     if len(response.questions) > 0 and response.is_clear:
         # Only delete messages if we have a conversation summary to preserve context
@@ -116,7 +136,8 @@ def analyze_and_rewrite_query(state: State, llm):
             "questionIsClear": True,
             "messages": messages_update,
             "originalQuery": last_message.content,
-            "rewrittenQuestions": response.questions
+            "rewrittenQuestions": response.questions,
+            "relevant_topics": response.relevant_topics,
         }
     else:
         clarification = (
@@ -157,11 +178,13 @@ def route_after_rewrite(state: State) -> Literal["human_input", "process_questio
         return "human_input"
     else:
         language = state.get("language", "en")
+        relevant_topics = state.get("relevant_topics", [])
         return [
             Send("process_question", {
                 "question": query,
                 "question_index": idx,
                 "language": language,
+                "relevant_topics": relevant_topics,
                 "messages": []
             })
             for idx, query in enumerate(state["rewrittenQuestions"])

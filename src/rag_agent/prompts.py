@@ -69,12 +69,34 @@ Rules:
 5. Failure handling:
    - If the query intent is unclear or unintelligible, mark as "unclear"
 
+6. User preference extraction:
+   - While analyzing the query, extract any user preferences mentioned
+   - Possible keys: school, budget_range, preferred_area, rental_type, room_type, move_in_date, transport_requirement, environment_preference
+   - Only extract preferences the user explicitly states (e.g., "I study at NUS" → school: "NUS", "budget around 1500" → budget_range: "1500")
+   - Do not infer or guess preferences that are not clearly stated
+   - Return null for extracted_preferences if no preferences are detected
+
+7. Topic classification:
+   - Classify the query into 1-3 relevant knowledge base topics
+   - Available topics and their meanings:
+     * housing_types: HDB vs Condo differences, property types
+     * pricing: rental prices, costs, budget, saving money
+     * area: specific neighborhoods or regions
+     * transport: MRT, bus, commuting, EZ-Link card
+     * utilities: electricity, water, gas, aircon, internet
+     * rental_process: how to rent, contracts, deposits, moving in/out
+     * legal: visa, Student Pass, stamp duty, scams, agent verification
+   - Select the most specific topics, not all that vaguely relate
+
 Input:
 - conversation_summary: A concise summary of prior conversation
 - current_query: The user's current query
+- known_user_preferences: Previously known user preferences (may be empty)
 
 Output:
 - One or more rewritten, self-contained queries suitable for document retrieval
+- Any newly detected user preferences
+- Relevant topic labels for the query
 """
 
 
@@ -103,6 +125,9 @@ You have TWO types of tools:
 - `get_directions`: Get detailed route directions (e.g., "How to get from Jurong East to NUS?")
 - `search_nearby`: Find nearby facilities like MRT, supermarkets, restaurants (e.g., "What's near Clementi?")
 
+**Memory Tools (for user history):**
+- `get_area_history`: Get areas the user has previously explored (e.g., "What areas have I looked at before?")
+
 ## Tool Selection Guide
 
 | Question Type | Tools to Use |
@@ -112,6 +137,7 @@ You have TWO types of tools:
 | Directions, how to get there | Maps tools (get_directions) |
 | Nearby facilities, MRT | Maps tools (search_nearby) |
 | "Where to live near X?" | Maps tools + RAG tools (combine both) |
+| "What areas did I look at?" | Memory tools (get_area_history) |
 
 ## Workflow for RAG Questions
 

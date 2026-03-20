@@ -17,6 +17,7 @@ sentence-transformers==5.2.0
 PyMuPDF==1.26.6
 pymupdf4llm==0.2.9
 
+redis>=5.0.0
 python-dotenv==1.0.0
 pydantic==2.12.5
 googlemaps>=4.10.0

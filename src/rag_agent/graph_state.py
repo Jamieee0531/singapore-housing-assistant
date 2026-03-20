@@ -3,7 +3,7 @@ State definitions for Singapore Housing Assistant RAG System.
 Defines the data structures that flow through the LangGraph workflow.
 """
 
-from typing import List, Annotated
+from typing import List, Optional, Annotated
 from langgraph.graph import MessagesState
 from pydantic import BaseModel, Field
 
@@ -28,6 +28,14 @@ def use_last_value(existing: str, new: str) -> str:
     return new if new else existing
 
 
+def use_last_list(existing: list, new: list) -> list:
+    """
+    Simple reducer for list fields that always uses the latest value.
+    Used for fields like 'relevant_topics' that may be set by multiple nodes.
+    """
+    return new if new else existing
+
+
 class State(MessagesState):
     """
     Main state for the housing assistant graph.
@@ -35,6 +43,10 @@ class State(MessagesState):
     Inherits from MessagesState to get message history management.
     Tracks conversation flow, query analysis, and aggregated answers.
     """
+
+    # User identification
+    user_id: str = "default"
+    """User ID for Redis profile lookup"""
 
     # Language setting (with reducer to handle concurrent updates)
     language: Annotated[str, use_last_value] = "en"
@@ -52,6 +64,13 @@ class State(MessagesState):
 
     rewrittenQuestions: List[str] = []
     """List of rewritten queries optimized for retrieval"""
+
+    relevant_topics: Annotated[List[str], use_last_list] = []
+    """Topic labels for metadata filtering (e.g., ['transport', 'pricing'])"""
+
+    # User profile (long-term memory from Redis)
+    user_profile: dict = {}
+    """User preferences loaded from Redis at session start"""
 
     # Agent answers (with custom reducer)
     agent_answers: Annotated[List[dict], accumulate_or_reset] = []
@@ -77,6 +96,9 @@ class AgentState(MessagesState):
 
     question_index: int = 0
     """Index of this question in the list of rewritten questions"""
+
+    relevant_topics: List[str] = []
+    """Topic labels for metadata filtering, passed from main graph"""
 
     final_answer: str = ""
     """The agent's final answer after retrieval and reasoning"""
@@ -116,4 +138,33 @@ class QueryAnalysis(BaseModel):
             "Empty if question is clear."
         ),
         default=""
+    )
+
+    # User preference extraction (piggybacks on the same LLM call)
+    extracted_preferences: Optional[dict] = Field(
+        description=(
+            "User preferences extracted from the current query. "
+            "Possible keys: school, budget_range, preferred_area, rental_type, "
+            "room_type, move_in_date, transport_requirement, environment_preference. "
+            "Only include keys that the user explicitly mentioned. "
+            "Return null if no preferences are detected."
+        ),
+        default=None
+    )
+
+    # Topic classification for metadata filtering
+    relevant_topics: List[str] = Field(
+        description=(
+            "Which knowledge base topics are relevant to this query. "
+            "Choose from: "
+            "housing_types (HDB vs Condo differences, property types), "
+            "pricing (rental prices, costs, budget, saving money), "
+            "area (specific neighborhoods or regions), "
+            "transport (MRT, bus, commuting, EZ-Link card), "
+            "utilities (electricity, water, gas, aircon, internet), "
+            "rental_process (how to rent, contracts, deposits, moving in/out), "
+            "legal (visa, Student Pass, stamp duty, scams, agent verification). "
+            "Select 1-3 most relevant topics."
+        ),
+        default=[]
     )

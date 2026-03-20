@@ -27,6 +27,7 @@ from src.config import (
 from src.rag_agent.tools import ToolFactory
 from src.rag_agent.maps_tools import MapsToolFactory
 from src.rag_agent.graph import create_agent_graph
+from src.db.redis_manager import RedisManager
 from src.i18n import get_ui_text, get_welcome_message, Language
 
 # Import LLM based on provider
@@ -119,7 +120,8 @@ class ChatSession:
         )
 
         # Create tools and graph
-        tool_factory = ToolFactory(collection=child_vector_store)
+        self.redis_manager = RedisManager()
+        tool_factory = ToolFactory(collection=child_vector_store, redis_manager=self.redis_manager)
         tools = tool_factory.create_tools()
 
         # Add Maps tools if API key is configured
@@ -163,15 +165,17 @@ class ChatSession:
         try:
             current_state = self.agent_graph.get_state(self.config)
 
+            user_id = self.config["configurable"]["thread_id"]
+
             if current_state.next:
                 self.agent_graph.update_state(
                     self.config,
-                    {"messages": [HumanMessage(content=message)], "language": language}
+                    {"messages": [HumanMessage(content=message)], "language": language, "user_id": user_id}
                 )
                 result = self.agent_graph.invoke(None, self.config)
             else:
                 result = self.agent_graph.invoke(
-                    {"messages": [HumanMessage(content=message)], "language": language},
+                    {"messages": [HumanMessage(content=message)], "language": language, "user_id": user_id},
                     self.config
                 )
 
@@ -203,16 +207,19 @@ class ChatSession:
             current_state = self.agent_graph.get_state(self.config)
             is_resuming = bool(current_state.next)
 
+            user_id = self.config["configurable"]["thread_id"]
+
             if is_resuming:
                 self.agent_graph.update_state(
                     self.config,
-                    {"messages": [HumanMessage(content=message)], "language": language}
+                    {"messages": [HumanMessage(content=message)], "language": language, "user_id": user_id}
                 )
                 stream_input = None
             else:
                 stream_input = {
                     "messages": [HumanMessage(content=message)],
                     "language": language,
+                    "user_id": user_id,
                 }
 
             accumulated = ""

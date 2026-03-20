@@ -36,7 +36,8 @@ from src.config import (
     CHILD_CHUNK_OVERLAP,
     MIN_PARENT_SIZE,
     MAX_PARENT_SIZE,
-    HEADERS_TO_SPLIT_ON
+    HEADERS_TO_SPLIT_ON,
+    FILE_TOPIC_MAPPING,
 )
 from src.db import ParentStoreManager
 
@@ -317,11 +318,15 @@ def index_documents(mode: str = "default"):
         print(f"   → Final parent chunks: {len(cleaned_parents)}")
         
         # Create child chunks and link to parents
+        source_name = doc_path.stem + ".md"
+        topics = FILE_TOPIC_MAPPING.get(source_name, [])
+
         for i, p_chunk in enumerate(cleaned_parents):
             parent_id = f"{doc_path.stem}_parent_{i}"
             p_chunk.metadata.update({
-                "source": doc_path.stem + ".md",
-                "parent_id": parent_id
+                "source": source_name,
+                "parent_id": parent_id,
+                "topics": topics,
             })
             all_parent_pairs.append((parent_id, p_chunk))
             

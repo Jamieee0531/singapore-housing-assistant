@@ -41,6 +41,14 @@ CHECKPOINT_DB_PATH = "checkpoints.db"       # SQLite checkpoint database
 THREAD_ID_PATH = "thread_id.txt"            # Persisted conversation thread ID
 
 # =============================================================================
+# Redis Configuration (Long-term Memory)
+# =============================================================================
+
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_DB = int(os.getenv("REDIS_DB", "0"))
+
+# =============================================================================
 # Qdrant Vector Database Configuration
 # =============================================================================
 
@@ -87,9 +95,42 @@ HEADERS_TO_SPLIT_ON = [
 # =============================================================================
 
 # Retrieval settings
-TOP_K_CHILD_CHUNKS = 7          # Number of child chunks to retrieve
+TOP_K_CHILD_CHUNKS = 5          # Final number of child chunks to return after reranking
+RETRIEVAL_CANDIDATES = 10       # Initial candidates to fetch before reranking
 SIMILARITY_THRESHOLD = 0.7      # Minimum similarity score (0-1)
 MAX_PARENT_RETRIEVAL = 3        # Max parent chunks to fetch per query
+
+# Re-ranking
+RERANK_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"  # Lightweight cross-encoder
+RERANK_ENABLED = True           # Toggle reranking on/off
+
+# =============================================================================
+# Metadata Filtering (Topic Labels)
+# =============================================================================
+
+ALL_TOPICS = [
+    "housing_types",    # HDB vs Condo differences, property types
+    "pricing",          # Rental prices, costs, budget, saving money
+    "area",             # Specific neighborhoods or regions
+    "transport",        # MRT, bus, commuting, EZ-Link card
+    "utilities",        # Electricity, water, gas, aircon, internet
+    "rental_process",   # How to rent, contracts, deposits, moving in/out
+    "legal",            # Visa, Student Pass, stamp duty, scams, agent verification
+]
+
+FILE_TOPIC_MAPPING = {
+    "hdb_vs_condo.md":        ["housing_types", "pricing", "rental_process"],
+    "price_range.md":         ["pricing", "area"],
+    "area_guide_central.md":  ["area", "pricing", "transport"],
+    "area_guide_east.md":     ["area", "pricing", "transport"],
+    "area_guide_west.md":     ["area", "pricing", "transport"],
+    "transport_guide.md":     ["transport", "pricing"],
+    "utilities_setup.md":     ["utilities", "pricing"],
+    "rental_guide.md":        ["rental_process", "legal"],
+    "rental_scams.md":        ["legal", "rental_process"],
+    "visa_housing_rules.md":  ["legal", "rental_process", "pricing"],
+    "student_budget_tips.md": ["pricing", "transport", "utilities"],
+}
 
 # Query analysis
 QUERY_ANALYSIS_TEMPERATURE = 0.1  # Low temp for query rewriting
@@ -99,7 +140,7 @@ MAPS_SEARCH_RADIUS = 1000          # Search radius in meters
 MAPS_MAX_RESULTS = 8               # Max nearby places to return
 
 # Conversation summarization
-SUMMARY_MIN_MESSAGES = 4           # Min messages before summarizing
+SUMMARY_MIN_MESSAGES = 10          # Min messages before summarizing
 SUMMARY_LAST_N_MESSAGES = 6        # Last N messages to include in summary
 SUMMARY_TEMPERATURE = 0.2          # Temperature for summary generation
 
